@@ -1,57 +1,95 @@
-﻿using ApiRozetka.Models;
+﻿using ApiRozetka.Constants;
+using ApiRozetka.Data.Entities.Identity;
+using ApiRozetka.Interfaces;
+using ApiRozetka.Models.Account;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace ApiRozetka.Controllers
 {
+    [Route("api/account")]
     [ApiController]
-    [Route("api/[controller]")]
-    public class AccountController : ControllerBase
+    public class AccountController(IJwtTokenService jwtTokenService,
+    IImageService imageService,
+    UserManager<UserEntity> userManager) : ControllerBase
     {
-        private static List<Account> accounts = new List<Account>();
+        [HttpPost("login")]
+        public async Task<IActionResult> Login([FromBody] LoginModel model)
+        {
+            var user = await userManager.FindByEmailAsync(model.Email);
+            if (user != null && await userManager.CheckPasswordAsync(user, model.Password))
+            {
+                var token = await jwtTokenService.CreateTokenAsync(user);
+                return Ok(new { Token = token });
+            }
+            return Unauthorized("Не вірно вказані дані");
+        }
 
         [HttpPost("register")]
-        public IActionResult Register([FromBody] Account account)
+        public async Task<IActionResult> Register([FromForm] RegisterModel model)
         {
-            if(accounts != null)
-                if (accounts.Any(x => x.Email == account.Email))
-                    return BadRequest("Account with this email already existed");
-
-            account.Id = accounts.Count + 1;
-
-            accounts.Add(account);
-
-            return Ok(new
+            try
             {
-                message = "Account created",
-                account = new
+                var user = await userManager.FindByEmailAsync(model.Email);
+                if (user != null)
+                    throw new Exception("Дана пошта уже зареєстрована");
+
+                user = new UserEntity
                 {
-                    account.Id,
-                    account.Email
+                    Email = model.Email,
+                    UserName = model.Email,
+                    LastName = model.LastName,
+                    FirstName = model.FirstName
+                };
+                if (model.ImageFile != null)
+                {
+                    user.Image = await imageService.SaveOptimizedImageAsync(model.ImageFile);
                 }
-            });
+                var result = await userManager.CreateAsync(user, model.Password);
+                if (!result.Succeeded)
+                {
+                    var errors = string.Join("; ", result.Errors.Select(e => e.Description));
+                    throw new Exception(errors);
+                }
+                await userManager.AddToRoleAsync(user, Roles.User);
+
+                var token = await jwtTokenService.CreateTokenAsync(user);
+                return Ok(new { Token = token });
+            }
+            catch (Exception e)
+            {
+                return BadRequest(new { Error = e.Message });
+            }
         }
 
-        [HttpPost("login")]
-        public IActionResult Login([FromBody] Account loginAccount)
+        [Authorize]
+        [HttpGet("profile")]
+        public async Task<IActionResult> Profile()
         {
-            var account = accounts.FirstOrDefault(x =>
-            x.Email == loginAccount.Email &&
-            x.Password == loginAccount.Password
-            );
+            var email = User.FindFirstValue(ClaimTypes.Email) ?? User.FindFirstValue("email");
 
-            if (account == null)
-                return Unauthorized("Invalid Email or password");
+            if (string.IsNullOrEmpty(email))
+                return Unauthorized();
 
-            return Ok(new
+            var user = await userManager.FindByEmailAsync(email);
+            if (user == null)
+                return NotFound();
+
+            var roles = await userManager.GetRolesAsync(user);
+
+            var model = new ProfileModel
             {
-                message = "Login succesful",
-                account = new
-                {
-                    account.Id,
-                    account.Email
-                }
-            });
-        }
+                Id = user.Id,
+                Email = user.Email ?? string.Empty,
+                FirstName = user.FirstName,
+                LastName = user.LastName,
+                Image = user.Image,
+                Roles = roles
+            };
 
+            return Ok(model);
+        }
     }
 }
