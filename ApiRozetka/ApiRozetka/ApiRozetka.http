@@ -1,0 +1,6 @@
+@ApiRozetka_HostAddress = http://localhost:5057
+
+GET {{ApiRozetka_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
