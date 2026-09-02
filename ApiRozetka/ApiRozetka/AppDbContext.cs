@@ -1,4 +1,5 @@
-﻿using ApiRozetka.Data.Entities.Identity;
+﻿using ApiRozetka.Data.Entities;
+using ApiRozetka.Data.Entities.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,6 +9,9 @@ namespace ApiRozetka
     {
         public AppDbContext(DbContextOptions options) : base(options) { }
 
+        public DbSet<CategoryEntity> Categories { get; set; }
+        public DbSet<ProductEntity> Products { get; set; }
+        public DbSet<ProductImageEntity> ProductImages { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
