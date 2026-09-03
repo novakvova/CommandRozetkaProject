@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { CreateProduct } from './components/CreateProduct';
 import { ProductList } from './components/ProductList';
-import type { IProduct, ICreateProductDto } from './types/product';
+import { Cart } from './components/Cart';
+import type { IProduct, ICreateProductDto, ICartItem } from './types/product';
 import './App.css';
 
-// Початкові товари
 const initialProducts: IProduct[] = [
   {
     id: 1,
@@ -25,20 +25,59 @@ const initialProducts: IProduct[] = [
 ];
 
 function App() {
-  const [activeTab, setActiveTab] = useState<'create' | 'list'>('create');
-  // Спільний стан для списку товарів
+  const [activeTab, setActiveTab] = useState<'create' | 'list' | 'cart'>('list');
   const [products, setProducts] = useState<IProduct[]>(initialProducts);
+  const [cartItems, setCartItems] = useState<ICartItem[]>([]);
 
-  // Функція додавання нового товару
+  // Хендлер додавання товару в кошик
+  const handleAddToCart = (product: IProduct) => {
+    setCartItems((prev) => {
+      const existing = prev.find((item) => item.product.id === product.id);
+      if (existing) {
+        return prev.map((item) =>
+          item.product.id === product.id
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        );
+      }
+      return [...prev, { product, quantity: 1 }];
+    });
+  };
+
+  // Зміна кількості товару в кошику
+  const handleUpdateQuantity = (productId: number, delta: number) => {
+    setCartItems((prev) =>
+      prev
+        .map((item) => {
+          if (item.product.id === productId) {
+            const newQty = item.quantity + delta;
+            return newQty > 0 ? { ...item, quantity: newQty } : null;
+          }
+          return item;
+        })
+        .filter(Boolean) as ICartItem[]
+    );
+  };
+
+  // Видалення товару з кошика
+  const handleRemoveItem = (productId: number) => {
+    setCartItems((prev) => prev.filter((item) => item.product.id !== productId));
+  };
+
+  // Очищення кошика
+  const handleClearCart = () => setCartItems([]);
+
+  // Створення нового товару
   const handleProductCreated = (newProductDto: ICreateProductDto) => {
     const newProduct: IProduct = {
       ...newProductDto,
-      id: Date.now(), // Генеруємо тимчасовий ID
+      id: Date.now(),
     };
-    
-    setProducts((prevProducts) => [newProduct, ...prevProducts]);
-    setActiveTab('list'); // Одразу переключаємо на вкладку списку
+    setProducts((prev) => [newProduct, ...prev]);
+    setActiveTab('list');
   };
+
+  const totalCartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
     <div className="app-container">
@@ -57,6 +96,12 @@ function App() {
           >
             Список товарів ({products.length})
           </button>
+          <button
+            className={`nav-btn ${activeTab === 'cart' ? 'active' : ''}`}
+            onClick={() => setActiveTab('cart')}
+          >
+            Кошик {totalCartCount > 0 && `(${totalCartCount})`}
+          </button>
         </nav>
       </header>
 
@@ -65,7 +110,15 @@ function App() {
           <CreateProduct onProductCreated={handleProductCreated} />
         )}
         {activeTab === 'list' && (
-          <ProductList products={products} />
+          <ProductList products={products} onAddToCart={handleAddToCart} />
+        )}
+        {activeTab === 'cart' && (
+          <Cart
+            cartItems={cartItems}
+            onUpdateQuantity={handleUpdateQuantity}
+            onRemoveItem={handleRemoveItem}
+            onClearCart={handleClearCart}
+          />
         )}
       </main>
     </div>
