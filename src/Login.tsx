@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 
 export const Login: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -7,15 +8,29 @@ export const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    try {
+        const response = await axios.post(
+          "https://localhost:7016/api/account/login",
+          {
+            email,
+            password
+          }
+        );
 
-    setTimeout(() => {
-      setLoading(false);
-      alert('Успішний вхід!');
-      navigate('/');
-    }, 800);
+        const token = response.data.token;
+
+        localStorage.setItem("token", token);
+
+        navigate("/profile");
+
+    } catch (error) {
+        console.error("Login error:", error);
+    } finally {
+        setLoading(false);
+    }
   };
 
   return (
@@ -65,3 +80,4 @@ export const Login: React.FC = () => {
 };
 
 export default Login;
+
